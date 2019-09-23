@@ -64,7 +64,7 @@ class MyClient(discord.Client):
 
     #Function to create the message that will be reacted for attendance
     async def postMeetPoll(self):
-        message = await self.commandsChannel.send(MSG_ATTENDANCE_REACT.format(self.confirmationDate))
+        message = await self.postChannel.send(MSG_ATTENDANCE_REACT.format(self.confirmationDate))
         toAwait = [message.add_reaction(EMOJI_OK), message.add_reaction(EMOJI_CANCEL), message.add_reaction(EMOJI_SHRUG)]
         asyncio.gather(*toAwait)
 

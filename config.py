@@ -12,7 +12,7 @@ POSTING_CH_ID = 625402636509773836
 COMMAND_CH_ID = 595739675428388874
 
 #Commands
-COMMAND_START = "!event"
+COMMAND_START = "!woe"
 COMMAND_REFILL_SHEET = "!refill"
 
 #Emojis
@@ -47,7 +47,7 @@ SHEET_ROW_OFFSET = 1
 
 MSG_FINISHED_LOADING = "Logged on as {0}!" #Console message shown when the bot is ready to work
 MSG_FETCH_ERROR = "Error fetching message with id {0}" #Console message shown when there's a failure fetching a message
-MSG_CONFIRMATION = "Start attendance for {0} event?\nThis will delete any current attendance data for the date on the sheet." #Chat message for confirming the event before continuing
+MSG_CONFIRMATION = "Empezar a tomar lista para la woe del {0}?\nEsto va a borrar lo que este cargado en la spreadsheet de asistencia." #Chat message for confirming the event before continuing
 MSG_LOG_MEET_START = "{0} started a meet." #Message for logging actions from the allowed roles
-MSG_ATTENDANCE_REACT = "{0} attendance:\n✅ - Will assist\n❎ - Won't assist\n🤷 - Maybe"
-MSG_MISSING_USERNAME = "We couldn't add your attendance because the name {} is missing in the google sheet https://docs.google.com/spreadsheets/d/"+SPREADSHEET_ID+" .Please add yourself or notify someone who can add you."
+MSG_ATTENDANCE_REACT = "{0} woe, presentismo:\n✅ - Va a WoE\n❎ - No va a WoE\n🤷 - Posible pero no es seguro"
+MSG_MISSING_USERNAME = "No encontramos el nombre {} en la planilla https://docs.google.com/spreadsheets/d/"+SPREADSHEET_ID+" .Agregate."
