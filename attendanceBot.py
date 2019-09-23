@@ -55,11 +55,12 @@ class MyClient(discord.Client):
     #Overload. See discord.py's Client documentation
     async def on_message(self, message):
         if message.channel.id == COMMAND_CH_ID and message.content == COMMAND_START and self.isAllowed(message.author):
+            self.cleanBeforeInput()
             self.confirmationDate = nextMeet()
             msg = await self.commandsChannel.send(MSG_CONFIRMATION.format(self.confirmationDate))
             self.confirmationMessageID = msg.id
             toAwait = [msg.add_reaction(EMOJI_OK), msg.add_reaction(EMOJI_CANCEL), message.delete()]
-            await asyncio.gather(*toAwait)
+            await asyncio.gather(*toAwait)            
 
     #Function to create the message that will be reacted for attendance
     async def postMeetPoll(self):
@@ -91,10 +92,9 @@ class MyClient(discord.Client):
         msg = await self.postChannel.fetch_message(payload.message_id)
         if msg.author.id != self.user.id:
             return
-        yes = payload.emoji.name == EMOJI_OK
-        no = payload.emoji.name == EMOJI_CANCEL
-        maybe = payload.emoji.name == EMOJI_SHRUG
+        date = msg.content.split(" ")[0].strip().replace("-","/")
         user = self.guilds[0].get_member(payload.user_id)
+        await self.assignReaction(user, payload.emoji.name, date)
 
     # Logs into the sheets api and assigns the service to self.sheetService
     def loginToSheet(self):
@@ -118,44 +118,37 @@ class MyClient(discord.Client):
         service = build('sheets', 'v4', credentials=creds)
         self.sheetService = service.spreadsheets()
 
-    #Loads or relaoads all the keys and users from the sheets
-    def loadKeys(self):
-        self.hasKey = set() #Set of usernames#discriminators
-        self.deliveredKey = {} #Dictionary 
-        self.availableKeys = [] #List of keys up for grabs
-        self.keyLookup = {} #Dictionary of [key] = (id, row)
-        hasKey = set()
-        availableKeys = []
-        keyLookup = {}
-        for sheetID in SPREADSHEET_IDS:
-            self.fetchKeysFromSheet(sheetID, SPREADSHEET_RANGE)
-
-    #Hits the google sheet through the previously set service and fetches the columns
-    #Starts at row 2 to and expects keys on column A, usernames on column B
-    #Loads things into the members previously defined in loadkeys
-    def fetchKeysFromSheet(self,sheetID, range):
-        result = self.sheetService.values().get(spreadsheetId=sheetID,range=range).execute()
+    #Assigns a reaction to the spreadsheet
+    #User is the user as a an object
+    #strEmoji the emoji as a string
+    #Date is the date for the event as a string in "yyyy/mm/dd" format
+    async def assignReaction(self,user,strEmoji,date):
+        result = self.sheetService.values().get(spreadsheetId=SPREADSHEET_ID,range=SHEET_DATE_RANGE,majorDimension="COLUMNS").execute()
         values = result.get('values', [])
+        dateColumn = ""
         if not values:
             print('No data found.')
-            exit(1)
+            return
         else:
-            counter = 1
-            for row in values:
-                counter += 1
-                key = row[0]
-                if key.startswith("//"):
-                    continue
-                if len(row) > 1:
-                    user = row[1]
-                    self.hasKey.add(user)
-                else:
-                    self.availableKeys.append(key)
-                self.keyLookup[key] = (sheetID,counter)
-
-    #Writes a value to the cell in the row, column is preset
-    def writeRow(self, rowNumber, sheetID, userName):
-        self.sheetService.values().update(spreadsheetId=sheetID,range=SPREADSHEET_WRITE_RANGE.format(rowNumber),body={ "values" : [[userName]] },valueInputOption="RAW").execute()
+            for x in range(len(values)):
+                if values[x][0] == date:
+                    dateColumn = LETTER_LOOKUP[x]
+        result = self.sheetService.values().get(spreadsheetId=SPREADSHEET_ID,range=SHEET_DISCORD_COLUMN).execute()
+        discordColumn = result.get('values', [])
+        if not discordColumn:
+            print('No data found.')
+            return
+        userRow = 0
+        strUser = str(user)
+        for x in range(len(discordColumn)):
+            if discordColumn[x] and discordColumn[x][0] == strUser:
+                self.sheetService.values().update(spreadsheetId=SPREADSHEET_ID,range="{}{}{}".format(SHEET_TAB_NAME,dateColumn,x+SHEET_ROW_OFFSET),body={ "values" : [[strEmoji]] },valueInputOption="RAW").execute()
+                return
+        if userRow == 0:
+            await user.send(MSG_MISSING_USERNAME.format(strUser))
+            
+    def cleanBeforeInput(self):
+        self.sheetService.values().clear(spreadsheetId=SPREADSHEET_ID,range=SHEET_CLEAN_RANGE).execute()
 
 if __name__ == '__main__':
     client = MyClient()
