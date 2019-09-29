@@ -124,7 +124,7 @@ class MyClient(discord.Client):
             for user in users:
                 if user.id != self.user.id:
                     await self.assignReaction(user, reaction.emoji, date, False)
-        msg = await self.commandsChannel.fetch_message(MSG_DONE_REFILL)
+        msg = await self.commandsChannel.send(MSG_DONE_REFILL)
 
     # Logs into the sheets api and assigns the service to self.sheetService
     def loginToSheet(self):
