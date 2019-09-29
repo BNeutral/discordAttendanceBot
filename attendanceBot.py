@@ -54,38 +54,49 @@ class MyClient(discord.Client):
 
     #Overload. See discord.py's Client documentation
     async def on_message(self, message):
-        if message.channel.id == COMMAND_CH_ID and message.content == COMMAND_START and self.isAllowed(message.author):
-            self.cleanBeforeInput()
-            self.confirmationDate = nextMeet()
-            msg = await self.commandsChannel.send(MSG_CONFIRMATION.format(self.confirmationDate))
-            self.confirmationMessageID = msg.id
-            toAwait = [msg.add_reaction(EMOJI_OK), msg.add_reaction(EMOJI_CANCEL), message.delete()]
-            await asyncio.gather(*toAwait)            
+        if message.channel.id == COMMAND_CH_ID and message.content in COMMANDS and self.isAllowed(message.author):
+            await message.delete()
+            if message.content == COMMAND_START:
+                self.confirmationDate = nextMeet()
+                msg = await self.commandsChannel.send(MSG_CONFIRMATION.format(self.confirmationDate))
+                self.confirmationMessageID = msg.id
+                toAwait = [msg.add_reaction(EMOJI_OK), msg.add_reaction(EMOJI_CANCEL)]
+                await asyncio.gather(*toAwait)            
+            elif message.content == COMMAND_REFILL_SHEET:
+                await self.refill()
+            else:
+                await self.commandsChannel.send(MSG_UNIMPLEMENTED_COMMAND.format(message.content))
 
-    #Function to create the message that will be reacted for attendance
+    #Function to create the message that will be reacted for attendance. Cleans the sheet also.
     async def postMeetPoll(self):
+        self.cleanSheet()
         message = await self.postChannel.send(MSG_ATTENDANCE_REACT.format(self.confirmationDate))
         toAwait = [message.add_reaction(EMOJI_OK), message.add_reaction(EMOJI_CANCEL), message.add_reaction(EMOJI_SHRUG)]
         asyncio.gather(*toAwait)
+
+    #Function to be called when the confirmation message for attendance has been reacted to
+    async def handleConfirmation(self, payload):
+        msg = await self.commandsChannel.fetch_message(self.confirmationMessageID)
+        user = self.guilds[0].get_member(payload.user_id)
+        userAccepted = payload.emoji.name == EMOJI_OK
+        userCanceled = payload.emoji.name == EMOJI_CANCEL
+        if userAccepted or userCanceled:
+            if self.isAllowed(user):
+                toAwait = []
+                if userAccepted:
+                    self.log(MSG_LOG_MEET_START.format(str(user)))
+                    toAwait.append(self.postMeetPoll())
+                self.confirmationMessageID = None
+                toAwait.append(msg.delete())
+                asyncio.gather(*toAwait)
+                return                        
+        return
 
     #Overload. See discord.py's Client documentation
     #payload members: message_id, user_id, channel_id, guild_id, emoji
     async def on_raw_reaction_add(self, payload):
         if payload.message_id == self.confirmationMessageID:
-            msg = await self.commandsChannel.fetch_message(self.confirmationMessageID)
-            user = self.guilds[0].get_member(payload.user_id)
-            goAhead = payload.emoji.name == EMOJI_OK
-            cancel = payload.emoji.name == EMOJI_CANCEL
-            if goAhead or cancel:
-                if self.isAllowed(user):
-                    toAwait = []
-                    if goAhead:
-                        self.log(MSG_LOG_MEET_START.format(str(user)))
-                        toAwait.append(self.postMeetPoll())
-                    self.confirmationMessageID = None
-                    toAwait.append(msg.delete())
-                    asyncio.gather(*toAwait)
-                    return                        
+            self.handleConfirmation(payload)
             return
         if payload.channel_id != POSTING_CH_ID:
             return
@@ -95,6 +106,25 @@ class MyClient(discord.Client):
         date = msg.content.split(" ")[0].strip().replace("-","/")
         user = self.guilds[0].get_member(payload.user_id)
         await self.assignReaction(user, payload.emoji.name, date)
+
+    #Given a message id, refills the sheet and prints anyone with issues instead of dming
+    async def refill(self):
+        msg = None
+        async for message in self.postChannel.history(limit=COMMAND_REFILL_HISTORY):
+            if message.author.id == self.user.id:
+                msg = message
+                break
+        if not msg:
+            await self.commandsChannel.send("Baaa")
+            return
+        self.cleanSheet()
+        date = msg.content.split(" ")[0].strip().replace("-","/")
+        for reaction in message.reactions:
+            users = await reaction.users().flatten()
+            for user in users:
+                if user.id != self.user.id:
+                    await self.assignReaction(user, reaction.emoji, date, False)
+        msg = await self.commandsChannel.fetch_message(MSG_DONE_REFILL)
 
     # Logs into the sheets api and assigns the service to self.sheetService
     def loginToSheet(self):
@@ -122,7 +152,7 @@ class MyClient(discord.Client):
     #User is the user as a an object
     #strEmoji the emoji as a string
     #Date is the date for the event as a string in "yyyy/mm/dd" format
-    async def assignReaction(self,user,strEmoji,date):
+    async def assignReaction(self,user,strEmoji,date,dmMissingUser=True):
         result = self.sheetService.values().get(spreadsheetId=SPREADSHEET_ID,range=SHEET_DATE_RANGE,majorDimension="COLUMNS").execute()
         values = result.get('values', [])
         dateColumn = ""
@@ -145,9 +175,13 @@ class MyClient(discord.Client):
                 self.sheetService.values().update(spreadsheetId=SPREADSHEET_ID,range="{}{}{}".format(SHEET_TAB_NAME,dateColumn,x+SHEET_ROW_OFFSET),body={ "values" : [[strEmoji]] },valueInputOption="RAW").execute()
                 return
         if userRow == 0:
-            await user.send(MSG_MISSING_USERNAME.format(strUser))
+            if dmMissingUser:
+                await user.send(MSG_MISSING_USERNAME.format(strUser))
+            else:
+                await self.commandsChannel.send(MSG_MISSING_USERNAME_POST.format(strUser))
+
             
-    def cleanBeforeInput(self):
+    def cleanSheet(self):
         self.sheetService.values().clear(spreadsheetId=SPREADSHEET_ID,range=SHEET_CLEAN_RANGE).execute()
 
 if __name__ == '__main__':
