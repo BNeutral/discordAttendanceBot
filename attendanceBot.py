@@ -96,7 +96,7 @@ class MyClient(discord.Client):
     #payload members: message_id, user_id, channel_id, guild_id, emoji
     async def on_raw_reaction_add(self, payload):
         if payload.message_id == self.confirmationMessageID:
-            self.handleConfirmation(payload)
+            await self.handleConfirmation(payload)
             return
         if payload.channel_id != POSTING_CH_ID:
             return
