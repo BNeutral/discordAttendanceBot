@@ -191,8 +191,7 @@ class MyClient(discord.Client):
             if dmMissingUser:
                 self.log(MSG_MISSING_USERNAME_POST.format(strUser))
                 await user.send(MSG_MISSING_USERNAME.format(strUser))
-            else:
-                await self.commandsChannel.send(MSG_MISSING_USERNAME_POST.format(strUser))
+            await self.commandsChannel.send(MSG_MISSING_USERNAME_POST.format(strUser))
 
     def cleanSheet(self):
         self.sheetService.values().clear(spreadsheetId=SPREADSHEET_ID,range=SHEET_CLEAN_RANGE).execute()
