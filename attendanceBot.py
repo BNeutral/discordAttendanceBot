@@ -34,9 +34,12 @@ class MyClient(discord.Client):
         self.commandsChannel = None
         self.confirmationMessageID = None 
         self.confirmationDate = None
+        self.tmpDateColumnFetch = None
+        self.tmpDiscordColumnFetch = None
 
     #Method for logging things to the log
     def log(self, message):
+        print(message)
         logger.info(message)
 
     #Overload. See discord.py's Client documentation
@@ -55,6 +58,8 @@ class MyClient(discord.Client):
     #Overload. See discord.py's Client documentation
     async def on_message(self, message):
         if message.channel.id == COMMAND_CH_ID and message.content in COMMANDS and self.isAllowed(message.author):
+            self.tmpDateColumnFetch = None
+            self.tmpDiscordColumnFetch = None
             await message.delete()
             if message.content == COMMAND_START:
                 self.confirmationDate = nextMeet()
@@ -153,21 +158,29 @@ class MyClient(discord.Client):
     #strEmoji the emoji as a string
     #Date is the date for the event as a string in "yyyy/mm/dd" format
     async def assignReaction(self,user,strEmoji,date,dmMissingUser=True):
-        result = self.sheetService.values().get(spreadsheetId=SPREADSHEET_ID,range=SHEET_DATE_RANGE,majorDimension="COLUMNS").execute()
-        values = result.get('values', [])
         dateColumn = ""
-        if not values:
-            print('No data found.')
-            return
+        if self.tmpDateColumnFetch:
+            dateColumn = self.tmpDateColumnFetch
         else:
-            for x in range(len(values)):
-                if values[x][0] == date:
-                    dateColumn = LETTER_LOOKUP[x]
-        result = self.sheetService.values().get(spreadsheetId=SPREADSHEET_ID,range=SHEET_DISCORD_COLUMN).execute()
-        discordColumn = result.get('values', [])
-        if not discordColumn:
-            print('No data found.')
-            return
+            result = self.sheetService.values().get(spreadsheetId=SPREADSHEET_ID,range=SHEET_DATE_RANGE,majorDimension="COLUMNS").execute()
+            values = result.get('values', [])
+            if not values:
+                print('No data found.')
+                return
+            else:
+                for x in range(len(values)):
+                    if values[x][0] == date:
+                        dateColumn = LETTER_LOOKUP[x]
+                        self.tmpDateColumnFetch = dateColumn
+                        break
+        if self.tmpDiscordColumnFetch:
+            discordColumn = self.tmpDiscordColumnFetch
+        else:
+            result = self.sheetService.values().get(spreadsheetId=SPREADSHEET_ID,range=SHEET_DISCORD_COLUMN).execute()
+            discordColumn = result.get('values', [])
+            if not discordColumn:
+                print('No data found.')
+                return
         userRow = 0
         strUser = str(user)
         for x in range(len(discordColumn)):
@@ -176,11 +189,11 @@ class MyClient(discord.Client):
                 return
         if userRow == 0:
             if dmMissingUser:
+                self.log(MSG_MISSING_USERNAME_POST.format(strUser))
                 await user.send(MSG_MISSING_USERNAME.format(strUser))
             else:
                 await self.commandsChannel.send(MSG_MISSING_USERNAME_POST.format(strUser))
 
-            
     def cleanSheet(self):
         self.sheetService.values().clear(spreadsheetId=SPREADSHEET_ID,range=SHEET_CLEAN_RANGE).execute()
 
