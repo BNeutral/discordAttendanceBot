@@ -34,8 +34,6 @@ class MyClient(discord.Client):
         self.commandsChannel = None
         self.confirmationMessageID = None 
         self.confirmationDate = None
-        self.tmpDateColumnFetch = None
-        self.tmpDiscordColumnFetch = None
 
     #Method for logging things to the log
     def log(self, message):
@@ -58,8 +56,6 @@ class MyClient(discord.Client):
     #Overload. See discord.py's Client documentation
     async def on_message(self, message):
         if message.channel.id == COMMAND_CH_ID and message.content in COMMANDS and self.isAllowed(message.author):
-            self.tmpDateColumnFetch = None
-            self.tmpDiscordColumnFetch = None
             await message.delete()
             if message.content == COMMAND_START:
                 self.confirmationDate = nextMeet()
@@ -106,11 +102,12 @@ class MyClient(discord.Client):
         if payload.channel_id != POSTING_CH_ID:
             return
         msg = await self.postChannel.fetch_message(payload.message_id)
-        if msg.author.id != self.user.id:
+        #Ignore messages that aren't from self and ignore self reactions
+        if msg.author.id != self.user.id or payload.user_id == self.user.id:
             return
         date = msg.content.split(" ")[0].strip().replace("-","/")
         user = self.guilds[0].get_member(payload.user_id)
-        await self.assignReaction(user, payload.emoji.name, date)
+        await self.assignReaction({str(user) : payload.emoji.name}, date)
 
     #Given a message id, refills the sheet and prints anyone with issues instead of dming
     async def refill(self):
@@ -124,11 +121,13 @@ class MyClient(discord.Client):
             return
         self.cleanSheet()
         date = msg.content.split(" ")[0].strip().replace("-","/")
+        usersAndReactions = {}
         for reaction in message.reactions:
             users = await reaction.users().flatten()
             for user in users:
                 if user.id != self.user.id:
-                    await self.assignReaction(user, reaction.emoji, date, False)
+                    usersAndReactions[str(user)] = reaction.emoji
+        await self.assignReaction(usersAndReactions, date)
         msg = await self.commandsChannel.send(MSG_DONE_REFILL)
 
     # Logs into the sheets api and assigns the service to self.sheetService
@@ -154,44 +153,45 @@ class MyClient(discord.Client):
         self.sheetService = service.spreadsheets()
 
     #Assigns a reaction to the spreadsheet
-    #User is the user as a an object
-    #strEmoji the emoji as a string
     #Date is the date for the event as a string in "yyyy/mm/dd" format
-    async def assignReaction(self,user,strEmoji,date,dmMissingUser=True):
+    #usersAndReactions is a dictionary of string usernames and the emoji as a string
+    async def assignReaction(self,usersAndReactions,date):
         dateColumn = ""
-        if self.tmpDateColumnFetch:
-            dateColumn = self.tmpDateColumnFetch
+        result = self.sheetService.values().get(spreadsheetId=SPREADSHEET_ID,range=SHEET_DATE_RANGE,majorDimension="COLUMNS").execute()
+        firstRow = result.get('values', [])
+        if not firstRow:
+            print('No data found.')
+            return
         else:
-            result = self.sheetService.values().get(spreadsheetId=SPREADSHEET_ID,range=SHEET_DATE_RANGE,majorDimension="COLUMNS").execute()
-            values = result.get('values', [])
-            if not values:
-                print('No data found.')
-                return
-            else:
-                for x in range(len(values)):
-                    if values[x][0] == date:
-                        dateColumn = LETTER_LOOKUP[x]
-                        self.tmpDateColumnFetch = dateColumn
-                        break
-        if self.tmpDiscordColumnFetch:
-            discordColumn = self.tmpDiscordColumnFetch
-        else:
-            result = self.sheetService.values().get(spreadsheetId=SPREADSHEET_ID,range=SHEET_DISCORD_COLUMN).execute()
-            discordColumn = result.get('values', [])
-            if not discordColumn:
-                print('No data found.')
-                return
-        userRow = 0
-        strUser = str(user)
-        for x in range(len(discordColumn)):
-            if discordColumn[x] and discordColumn[x][0] == strUser:
-                self.sheetService.values().update(spreadsheetId=SPREADSHEET_ID,range="{}{}{}".format(SHEET_TAB_NAME,dateColumn,x+SHEET_ROW_OFFSET),body={ "values" : [[strEmoji]] },valueInputOption="RAW").execute()
-                return
-        if userRow == 0:
-            if dmMissingUser:
-                self.log(MSG_MISSING_USERNAME_POST.format(strUser))
-                await user.send(MSG_MISSING_USERNAME.format(strUser))
-            await self.commandsChannel.send(MSG_MISSING_USERNAME_POST.format(strUser))
+            for x in range(len(firstRow)):
+                if firstRow[x][0] == date:
+                    dateColumn = LETTER_LOOKUP[x]
+                    break
+        result = self.sheetService.values().get(spreadsheetId=SPREADSHEET_ID,range=SHEET_DISCORD_COLUMN).execute()
+        discordUsernamesColumn = result.get('values', [])
+        if not discordUsernamesColumn:
+            print('No data found.')
+            return
+        assistanceRange = "{0}{1}2:{1}{2}".format(SHEET_TAB_NAME,dateColumn,1+SHEET_VERTICAL_LENGTH)
+        result = self.sheetService.values().get(spreadsheetId=SPREADSHEET_ID,range=assistanceRange).execute()
+        assistanceColumn = result.get('values', [])
+        if len(discordUsernamesColumn) > len(assistanceColumn):
+            assistanceColumn.extend([[]]* (len(discordUsernamesColumn)-len(assistanceColumn)))
+        notFound = set(usersAndReactions.keys())
+        for row in range(len(discordUsernamesColumn)):
+            if len(discordUsernamesColumn[row]) == 0:
+                continue
+            userName = discordUsernamesColumn[row][0]
+            if userName in usersAndReactions:
+                assistanceColumn[row] = [usersAndReactions[userName]]
+                try:
+                    notFound.remove(userName)
+                except:
+                    pass
+        self.sheetService.values().update(spreadsheetId=SPREADSHEET_ID,range=assistanceRange,body={ "values" : assistanceColumn },valueInputOption="RAW").execute()
+        for user in notFound:
+            self.log(MSG_MISSING_USERNAME_POST.format(user))
+            await self.commandsChannel.send(MSG_MISSING_USERNAME_POST.format(user))
 
     def cleanSheet(self):
         self.sheetService.values().clear(spreadsheetId=SPREADSHEET_ID,range=SHEET_CLEAN_RANGE).execute()

@@ -44,8 +44,9 @@ LETTER_LOOKUP = letterLUT()
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets'] # If modifying these scopes, delete the file token.pickle.
 SHEET_TAB_NAME = 'INFO!' #Range where to search for user ids
 SHEET_DATE_RANGE = SHEET_TAB_NAME+'A1:H1' #Range where to search for the date, keep it to a single row that starts at A. Currently only supports A-Z but expanding is trivial.
-SHEET_DISCORD_COLUMN = SHEET_TAB_NAME+'I1:I300' #Range where to search for user ids
-SHEET_CLEAN_RANGE = SHEET_TAB_NAME+'G2:H300' #Range to clean on event prompt
+SHEET_VERTICAL_LENGTH = 300
+SHEET_DISCORD_COLUMN = SHEET_TAB_NAME+'I2:I'+str(2+SHEET_VERTICAL_LENGTH) #Range where to search for user ids
+SHEET_CLEAN_RANGE = SHEET_TAB_NAME+'G2:H'+str(2+SHEET_VERTICAL_LENGTH) #Range to clean on event prompt
 SHEET_ROW_OFFSET = 1
 
 #English default
