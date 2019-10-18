@@ -59,6 +59,7 @@ MSG_LOG_MEET_START = "{0} started a meet." #Message for logging actions from the
 MSG_MISSING_USERNAME_POST = "Missing user {} on the spreadsheet." #Message to post on the channel if a user is missing when using !refill
 MSG_UNIMPLEMENTED_COMMAND = "The requested command {} is not yet implemented."
 #MSG_DONE_REFILL = "Done refilling."
+MSG_MISSING_DATE = "Couldn't find the {} date in the spreadsheet."
 
 #Spanish adapted to local use
 MSG_CONFIRMATION = "Empezar a tomar lista para la woe del {0}?\nEsto va a borrar lo que este cargado en la spreadsheet de asistencia." #Chat message for confirming the event before continuing

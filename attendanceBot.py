@@ -167,6 +167,10 @@ class MyClient(discord.Client):
                 if firstRow[x][0] == date:
                     dateColumn = LETTER_LOOKUP[x]
                     break
+        if dateColumn == "":
+            self.log(MSG_MISSING_DATE.format(date))
+            await self.commandsChannel.send(MSG_MISSING_DATE.format(date))
+            return
         result = self.sheetService.values().get(spreadsheetId=SPREADSHEET_ID,range=SHEET_DISCORD_COLUMN).execute()
         discordUsernamesColumn = result.get('values', [])
         if not discordUsernamesColumn:
