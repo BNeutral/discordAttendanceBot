@@ -188,10 +188,8 @@ class MyClient(discord.Client):
             userName = discordUsernamesColumn[row][0]
             if userName in usersAndReactions:
                 assistanceColumn[row] = [usersAndReactions[userName]]
-                try:
+                if userName in notFound:
                     notFound.remove(userName)
-                except:
-                    pass
         self.sheetService.values().update(spreadsheetId=SPREADSHEET_ID,range=assistanceRange,body={ "values" : assistanceColumn },valueInputOption="RAW").execute()
         for user in notFound:
             self.log(MSG_MISSING_USERNAME_POST.format(user))
