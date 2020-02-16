@@ -111,6 +111,7 @@ class MyClient(discord.Client):
 
     #Given a message id, refills the sheet and prints anyone with issues instead of dming
     async def refill(self):
+        self.loginToSheet()
         msg = None
         async for message in self.postChannel.history(limit=COMMAND_REFILL_HISTORY):
             if message.author.id == self.user.id:
@@ -156,6 +157,7 @@ class MyClient(discord.Client):
     #Date is the date for the event as a string in "yyyy/mm/dd" format
     #usersAndReactions is a dictionary of string usernames and the emoji as a string
     async def assignReaction(self,usersAndReactions,date):
+        self.loginToSheet()
         dateColumn = ""
         result = self.sheetService.values().get(spreadsheetId=SPREADSHEET_ID,range=SHEET_DATE_RANGE,majorDimension="COLUMNS").execute()
         firstRow = result.get('values', [])
