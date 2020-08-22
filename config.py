@@ -63,6 +63,6 @@ MSG_MISSING_DATE = "Couldn't find the {} date in the spreadsheet."
 
 #Spanish adapted to local use
 MSG_CONFIRMATION = "Empezar a tomar lista para la woe del {0}?\nEsto va a borrar lo que este cargado en la spreadsheet de asistencia." #Chat message for confirming the event before continuing
-MSG_ATTENDANCE_REACT = "{0} woe, presentismo:\n✅ - Va a WoE\n❎ - No va a WoE\n🤷 - Posible pero no es seguro"
+MSG_ATTENDANCE_REACT = "{0} woe, presentismo:{1}\n✅ - Va a WoE\n❎ - No va a WoE\n🤷 - Posible pero no es seguro"
 MSG_MISSING_USERNAME = "No encontramos el nombre {} en la planilla https://docs.google.com/spreadsheets/d/"+SPREADSHEET_ID+" .Agregate."
 MSG_DONE_REFILL = "Actualizado."

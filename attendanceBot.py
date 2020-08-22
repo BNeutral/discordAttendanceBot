@@ -19,6 +19,9 @@ handler = logging.FileHandler(filename=LOG_FILE, encoding='utf-8', mode='a')
 handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))
 logger.addHandler(handler)
 
+#Some state
+commandInput = ""
+
 def nextMeet():
     date = datetime.date.today()
     while date.weekday() not in MEET_DAYS:
@@ -55,23 +58,25 @@ class MyClient(discord.Client):
 
     #Overload. See discord.py's Client documentation
     async def on_message(self, message):
-        if message.channel.id == COMMAND_CH_ID and message.content in COMMANDS and self.isAllowed(message.author):
-            await message.delete()
-            if message.content == COMMAND_START:
-                self.confirmationDate = nextMeet()
-                msg = await self.commandsChannel.send(MSG_CONFIRMATION.format(self.confirmationDate))
-                self.confirmationMessageID = msg.id
-                toAwait = [msg.add_reaction(EMOJI_OK), msg.add_reaction(EMOJI_CANCEL)]
-                await asyncio.gather(*toAwait)            
-            elif message.content == COMMAND_REFILL_SHEET:
-                await self.refill()
-            else:
-                await self.commandsChannel.send(MSG_UNIMPLEMENTED_COMMAND.format(message.content))
+        if message.channel.id == COMMAND_CH_ID and self.isAllowed(message.author):
+            if message.content.split(" ")[0] in COMMANDS:
+                await message.delete()
+                if message.content.startswith(COMMAND_START):
+                    self.commandInput = message.content.replace(COMMAND_START,"")
+                    self.confirmationDate = nextMeet()
+                    msg = await self.commandsChannel.send(MSG_CONFIRMATION.format(self.confirmationDate))
+                    self.confirmationMessageID = msg.id
+                    toAwait = [msg.add_reaction(EMOJI_OK), msg.add_reaction(EMOJI_CANCEL)]
+                    await asyncio.gather(*toAwait)
+                elif message.content == COMMAND_REFILL_SHEET:
+                    await self.refill()
+                else:
+                    await self.commandsChannel.send(MSG_UNIMPLEMENTED_COMMAND.format(message.content))
 
     #Function to create the message that will be reacted for attendance. Cleans the sheet also.
     async def postMeetPoll(self):
         self.cleanSheet()
-        message = await self.postChannel.send(MSG_ATTENDANCE_REACT.format(self.confirmationDate))
+        message = await self.postChannel.send(MSG_ATTENDANCE_REACT.format(self.confirmationDate, self.commandInput))
         toAwait = [message.add_reaction(EMOJI_OK), message.add_reaction(EMOJI_CANCEL), message.add_reaction(EMOJI_SHRUG)]
         asyncio.gather(*toAwait)
 
